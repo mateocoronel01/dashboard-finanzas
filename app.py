@@ -3,11 +3,11 @@ import pandas as pd
 import plotly.express as px
 
 # -------------------------------
-# Título y bienvenida
+# Configuración del Dashboard
 # -------------------------------
-st.set_page_config(page_title="Dashboard de Finanzas", layout="wide")
-st.title("💰 Mi Dashboard de Finanzas")
-st.write("Aquí puedes ver y analizar los gastos que tienes en tu Google Sheet en tiempo real.")
+st.set_page_config(page_title="Dashboard de Finanzas Mensuales", layout="wide")
+st.title("💰 Dashboard de Finanzas Mensuales")
+st.write("Actualiza tu Google Sheet y el dashboard se actualizará automáticamente.")
 
 # -------------------------------
 # Cargar datos desde Google Sheets
@@ -22,30 +22,60 @@ except Exception as e:
     st.error(f"No se pudo cargar la hoja de cálculo: {e}")
     st.stop()
 
-# -------------------------------
-# Mostrar tabla de datos
-# -------------------------------
-st.subheader("Tabla de gastos")
-st.dataframe(df)
+# Convertir columna Fecha a datetime
+df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
 
 # -------------------------------
-# Agrupar por tipo de gasto
+# Selección de mes a mostrar
 # -------------------------------
-if "Tipo de Gasto" not in df.columns or "Monto" not in df.columns:
-    st.warning("Tu Google Sheet debe tener columnas llamadas 'Tipo de Gasto' y 'Monto'")
-else:
-    df_agg = df.groupby("Tipo de Gasto")["Monto"].sum().reset_index()
+mes_seleccionado = st.selectbox(
+    "Selecciona el mes",
+    df['Fecha'].dt.to_period("M").sort_values(ascending=False).astype(str).unique()
+)
 
-    # -------------------------------
-    # Gráfico circular interactivo
-    # -------------------------------
-    st.subheader("Distribución de gastos por tipo")
-    fig = px.pie(
-        df_agg,
-        names="Tipo de Gasto",
+df_mes = df[df['Fecha'].dt.to_period("M").astype(str) == mes_seleccionado]
+
+# -------------------------------
+# Totales de ingresos y gastos
+# -------------------------------
+total_ingresos = df_mes[df_mes['Tipo'] == "Ingreso"]['Monto'].sum()
+total_gastos = df_mes[df_mes['Tipo'] == "Gasto"]['Monto'].sum()
+
+st.metric("Total Ingresos 💵", f"{total_ingresos} €")
+st.metric("Total Gastos 🛒", f"{total_gastos} €")
+st.metric("Balance 🏦", f"{total_ingresos - total_gastos} €")
+
+# -------------------------------
+# Gráfico circular de gastos por categoría
+# -------------------------------
+df_gastos = df_mes[df_mes['Tipo'] == "Gasto"]
+if not df_gastos.empty:
+    df_gastos_agg = df_gastos.groupby("Categoría")['Monto'].sum().reset_index()
+    fig_pie = px.pie(
+        df_gastos_agg,
+        names="Categoría",
         values="Monto",
-        color="Tipo de Gasto",
+        color="Categoría",
         hole=0.3,
-        title="Gastos por categoría"
+        title=f"Gastos por categoría - {mes_seleccionado}"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+# -------------------------------
+# Gráfico de barras de gastos
+# -------------------------------
+if not df_gastos.empty:
+    fig_bar = px.bar(
+        df_gastos_agg,
+        x="Categoría",
+        y="Monto",
+        color="Categoría",
+        title=f"Gastos por categoría (barras) - {mes_seleccionado}"
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+# -------------------------------
+# Tabla interactiva de todos los movimientos
+# -------------------------------
+st.subheader(f"Movimientos del mes {mes_seleccionado}")
+st.dataframe(df_mes.sort_values(by="Fecha", ascending=False))
