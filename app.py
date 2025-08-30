@@ -1,1 +1,4 @@
-1ZvI0Svvj12hCcMmVFg9uE7dL80p5BP76cjoyEbjihek
+import streamlit as st
+
+st.title("Mi Dashboard de Finanzas")
+st.write("¡Hola! Aquí podrás ver tus datos financieros.")
